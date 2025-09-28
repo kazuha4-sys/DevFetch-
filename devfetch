@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+# ================================
+# Devfetch - Uma ferramenta para ajudar Dev's na organização de projetos
+# Mostra infos úteis para o Dev
+# ================================
+
+# ================================
+# ASCII Art
+# ================================
+ascii=$(cat << ASCII
+\e[34m    ____                  ______         __            __ \e[0m
+\e[34m   / __ \  ___  _   __   / ____/  ___   / /_  _____   / /_ \e[0m
+\e[34m  / / / / / _ \| | / /  / /_     / _ \ / __/ / ___/  / __ \ \e[0m
+\e[34m / /_/ / /  __/| |/ /  / __/    /  __// /_  / /__   / / / / \e[0m
+\e[34m/_____/  \___/ |___/  /_/       \___/ \__/  \___/  /_/ /_/ \e[0m
+____________________________________________________________                                                        
+ASCII
+)
+
+
+ascii_laravel=$(cat << ASCII
+\e[31m    █████ \e[0m                      
+\e[31m ███     ███ \e[0m                   
+\e[31m███       ███         ██ ██ \e[0m   
+\e[31m█   █████   █     ███       ███ \e[0m
+\e[31m█     █     █     ████     ████ \e[0m
+\e[31m█     █     █     █    ███    █ \e[0m
+\e[31m█     █     █     █     █     █ \e[0m
+\e[31m█     █     █    ███    █    ██ \e[0m
+\e[31m█     █     █ ██    ████████ \e[0m  
+\e[31m█     █   ███         ███ \e[0m     
+\e[31m█     ████         ███  █ \e[0m     
+\e[31m█      ██       ██      █ \e[0m    
+\e[31m█         █████         █ \e[0m     
+\e[31m ███        █        ███ \e[0m      
+\e[31m     ██     █     ██ \e[0m          
+\e[31m        ███ █ ███ \e[0m             
+\e[31m           ███ \e[0m                
+
+ASCII
+)
+
+ascii_git=$(cat << ASCII
+\e[33m        _  _   \e[0m
+\e[31m       (_)| |  \e[0m
+\e[32m  __ _  _ | |_ \e[0m
+\e[34m / _\` || || __|\e[0m
+\e[33m| (_| || || |_ \e[0m
+\e[31m \__, ||_| \__|\e[0m
+\e[32m  __/ | _______       \e[0m
+\e[34m |___/ / \e[0m
+\e[33m _____/ \e[0m
+ASCII
+)
+   
+# ================================
+# Funções principais
+# ================================
+menu() {
+    echo "Vamos trabalhar com que:"
+    echo "(1) Git"
+    echo "(2) Docker"
+    echo "(3) Dev"
+    read -p "Opção: " opt
+
+    case "$opt" in
+        1) ./devfetch --loop ;;
+        2) show_docker ;;
+        3) ./devfetch --dev ;;
+        *) echo "Opção inválida!" ;;
+    esac
+}
+show_dev() {
+    # joga o ascii em linhas
+    ascii_lines=()
+    while IFS= read -r line; do
+        ascii_lines+=("$line")
+    done < <(printf "%b\n" "$ascii")
+
+    # aqui tu imprime o ascii
+    for line in "${ascii_lines[@]}"; do
+        echo "$line"
+    done
+    echo "____________________________________________________________"
+    echo
+
+    # agora mostra infos de versões
+    echo "PHP Version: $(php -v 2>/dev/null | head -n1 | awk '{print $2}' || echo 'não encontrado')"
+    echo "Node Version: $(node -v 2>/dev/null | sed 's/v//' || echo 'não encontrado')"
+    echo "Python Version: $(python3 --version 2>/dev/null | awk '{print $2}' || echo 'não encontrado')"
+    echo "Laravel Version: $(php artisan --version 2>/dev/null)"
+    echo "Composer Version: $(composer --version 2>/dev/null | awk '{print $3}' || echo 'não encontrado')"
+
+
+    if command -v systemctl &>/dev/null; then
+        echo "MySQL: $(systemctl is-active mysql 2>/dev/null || echo 'desconhecido')"
+        echo "Redis: $(systemctl is-active redis 2>/dev/null || echo 'desconhecido')"
+    else
+        echo "MySQL: $(command -v mysql &>/dev/null && echo 'instalado' || echo 'não encontrado')"
+        echo "Redis: $(command -v redis-server &>/dev/null && echo 'instalado' || echo 'não encontrado')"
+    fi
+}
+
+
+show_laravel() {
+    # joga o ascii em linhas
+    ascii_lines=()
+    while IFS= read -r line; do
+        ascii_lines+=("$line")
+    done < <(printf "%b\n" "$ascii_laravel")
+
+    # printa o ascii
+    for line in "${ascii_lines[@]}"; do
+        echo -e "$line"
+    done
+
+    # checa versão
+    if [ -f "artisan" ]; then 
+        version=$(php artisan --version 2>/dev/null)
+        echo -e "\e[32m[Laravel]\e[0m $version"
+    elif [ -f "composer.json" ]; then 
+        version=$(grep '"laravel/framework"' composer.json | sed -E 's/.*"([0-9\.]+)".*/\1/')
+        echo -e "\e[32m[Laravel]\e[0m Framework $version (composer.json)"
+    fi            
+}
+
+
+
+show_git() {
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+        # pega as infos do git
+        url=$(git config --get remote.origin.url 2>/dev/null)
+        clean=$(echo "$url" | sed -E 's#(git@|https?://)##; s#[:/]#/#g; s#\.git$##')
+        owner=$(echo "$clean" | awk -F'/' '{print $(NF-1)}')
+        repo=$(echo "$clean" | awk -F'/' '{print $NF}')
+        branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "desconhecido")
+        commits=$(git status --porcelain 2>/dev/null | wc -l)
+        last_commit=$(git log -1 --pretty=format:'%s (%an)' 2>/dev/null || echo "nenhum commit")
+        version=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD 2>/dev/null || echo "nenhuma versão")
+
+        # organiza infos em array
+        infos=(
+            "Git versão: $(git --version 2>/dev/null | awk '{print $3}')"
+            "URL: ${url:-não configurado}"
+            "Repo: ${repo:-desconhecido}"
+            "Owner: ${owner:-desconhecido}"
+            "Branch: ${branch:-desconhecido}"
+            "Versão: ${version:-desconhecido}"
+            "Commits pendentes: ${commits}"
+            "Último commit: ${last_commit}"
+        )
+
+        # joga o ascii em linhas
+        ascii_lines=()
+        while IFS= read -r line; do
+            ascii_lines+=("$line")
+        done < <(printf "%b\n" "$ascii_git")
+
+        # imprime lado a lado
+        for i in "${!ascii_lines[@]}"; do
+            left="${ascii_lines[$i]}"
+            right="${infos[$i]}"
+            printf "%-35s %s\n" "$left" "$right"
+        done
+    else
+        echo "🌱 Git: não está em um repositório"
+    fi
+}
+
+show_docker() {
+    if command -v docker &>/dev/null; then
+        echo "📦 Docker"
+        echo "Containers ativos: $(docker ps -q | wc -l)"
+        docker ps --format ' - {{.Names}} ({{.Status}})'
+    else
+        echo "📦 Docker: não encontrado"
+    fi
+}
+
+loop_fetch() {
+    # salva o cursor no topo
+    tput civis # esconde o cursor (fica mais clean)
+    trap "tput cnorm; exit" INT TERM # volta o cursor quando sair
+
+    while true; do
+        tput cup 0 0   # manda o cursor pra linha 0, coluna 0
+        printf '\033[0J'  # limpa da posição até o fim da tela
+
+        echo "_____________________________DevFetch_____________________________"
+        show_git
+
+        sleep 10
+    done
+}
+
+# ================================
+# Main
+# ================================
+main() {
+    case "$1" in
+        "" ) menu ;;
+
+        --dev) show_dev ;;
+        --git) show_git ;;
+        --docker) show_docker ;;
+        --all|"") show_dev; echo; show_docker; echo; show_git ;;
+        --loop) loop_fetch ;;
+        --laravel) show_laravel ;;
+        *) echo "Uso: $0  [--dev | --git | --docker | --all | --loop] [--laravel |"; exit 1 ;;
+    esac
+}
+
+main "$@"
