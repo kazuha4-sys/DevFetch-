@@ -27,7 +27,7 @@ DevFetch é um *fetch* pra devs — mostra versão do PHP/Node/Python, status de
 * Modo `--dev`, `--git`, `--docker` pra mostrar só o que interessa.
 
 ## Requisitos
-
+w
 * Bash (óbvio)
 * git
 * php (opcional)
@@ -96,9 +96,55 @@ devfetch --git
 devfetch --loop
 ```
 
-## Contribuição
+## 🔧 Quer meter a mão no código? (É Open Source, porra!)
 
-Se quiser contribuir: abre um PR, manda uns commits limpos, escreve tests (se fizer algo complexo) e segue o padrão de código. Não fique com preguiça e explique o porquê das mudanças.
+**Sim. É open source.** Se tu curte fuçar, melhorar, quebrar e consertar — traz tua porra de coragem e vem.  
+Abaixo o passo a passo estilo *sem mimimi* pra contribuir.
+
+---
+
+### 🚀 Como contribuir 
+1. **Forka** o repo.  
+2. **Cria um branch** com nome decente:
+   - `feat/minha-coisa` — nova feature  
+   - `fix/bug-idiota` — correção  
+   - `chore/docs` — só docs mesmo  
+3. **Faz as mudanças** com commits limpinhos e descritivos.  
+4. **Abre um PR** explicando o porquê da mudança. Se for grande, abre uma issue antes pra alinharmos a bagunça.  
+5. **Mantém o estilo** de código do projeto e adiciona testes quando fizer sentido.
+
+---
+
+### ✅ Checklist mínimo pro PR
+- [ ] Código compila/roda no pipeline (ou passa localmente).  
+- [ ] Testes relevantes adicionados/atualizados.  
+- [ ] Descrição clara do que mudou e por quê.  
+- [ ] Referência à issue (se tiver).  
+- [ ] Sem commits lixo (squash quando fizer sentido).
+
+---
+
+### 🧾 Dicas pra ajudar sem stress
+- Encontrou um bug estranho? Abre uma **issue** com steps pra reproduzir.  
+- Tem uma ideia cabulosa? Abre a issue com um esboço e a gente debate.  
+- Quer só melhorar o README? Faz PR direto — docs são sagrados.  
+- Não sabe por onde começar? Procura por issues com label `good-first-issue` ou `help-wanted`.
+
+---
+
+### 📜 Licença
+Recomendamos **MIT** — liberdade pra usar, copiar, modificar e contribuir sem frescura. Se quiser outra licença, fale aí.
+
+---
+
+### 🔗 Link do repo
+`<COLE_AQUI_O_SEU_REPO>` — entra, clona, fuça e manda ver.  
+Se quiser feedback rápido, marca a issue com `@maintainer` ou abre um PR. A gente responde (ou xinga, depende do dia).
+
+---
+
+**Resumo**: o projeto é público e bem-vindo pra todos que queiram ajudar. Traz coragem, faz o PR e vamos somar — aqui não é museu, é oficina. 🤘
+
 
 ## Licença
 
