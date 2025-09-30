@@ -13,7 +13,7 @@ ____________________________________________________________
 
 ---
 
-## Porra, o que é isso?
+## O que é isso?
 
 DevFetch é um *fetch* pra devs — mostra versão do PHP/Node/Python, status de MySQL/Redis, infos do Git (repo, branch, commits pendentes, último commit), e pode rodar num loop que atualiza automático. Ideal pra **dotfiles**, **status machines**, ou só pra encher o terminal de orgulho.
 
