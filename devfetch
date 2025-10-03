@@ -100,8 +100,6 @@ show_dev() {
         echo "Redis: $(command -v redis-server &>/dev/null && echo 'instalado' || echo 'não encontrado')"
     fi
 }
-
-
 show_laravel() {
     # joga o ascii em linhas
     ascii_lines=()
@@ -113,18 +111,154 @@ show_laravel() {
     for line in "${ascii_lines[@]}"; do
         echo -e "$line"
     done
+    echo
 
-    # checa versão
-    if [ -f "artisan" ]; then 
-        version=$(php artisan --version 2>/dev/null)
-        echo -e "\e[32m[Laravel]\e[0m $version"
-    elif [ -f "composer.json" ]; then 
-        version=$(grep '"laravel/framework"' composer.json | sed -E 's/.*"([0-9\.]+)".*/\1/')
-        echo -e "\e[32m[Laravel]\e[0m Framework $version (composer.json)"
-    fi            
+    # checa se é projeto laravel
+    if [ ! -f "artisan" ]; then
+        echo -e "\e[31m[Laravel]\e[0m Não achei o arquivo \`artisan\` aqui. Vai pra pasta do projeto antes, mano."
+        return
+    fi
+
+    # versão
+    version=$(php artisan --version 2>/dev/null)
+    echo -e "\e[32m[Laravel]\e[0m $version"
+    echo "____________________________________________________________"
+
+    # função interna pra ler .env (se existir)
+    read_env() {
+        local key="$1"
+        if [ -f ".env" ]; then
+            # remove aspas e espaços
+            grep -E "^${key}=" .env 2>/dev/null | tail -n1 | cut -d'=' -f2- | sed -E 's/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/; s/^[[:space:]]+//; s/[[:space:]]+$//'
+        else
+            echo ""
+        fi
+    }
+
+    APP_NAME=$(read_env "APP_NAME")
+    APP_ENV=$(read_env "APP_ENV")
+    APP_DEBUG=$(read_env "APP_DEBUG")
+    APP_KEY=$(read_env "APP_KEY")
+
+    echo "App Name: ${APP_NAME:-não configurado}"
+    echo "App Env:  ${APP_ENV:-desconhecido}"
+    echo "Debug:    ${APP_DEBUG:-desconhecido}"
+    if [ -n "$APP_KEY" ]; then
+        echo "Key:      ${APP_KEY:0:20}... (oculta)"
+    else
+        echo "Key:      não definida"
+    fi
+
+    # mostra um menu interativo
+    while true; do
+        echo
+        echo -e "\e[36mEscolha uma opção Laravel (digita o número e dá enter):\e[0m"
+        echo " 1) Rodar migrations (php artisan migrate)"
+        echo " 2) Ver status das migrations (php artisan migrate:status)"
+        echo " 3) Listar rotas (route:list)"
+        echo " 4) Limpar cache/config/routes (cache:clear, config:clear, route:clear)"
+        echo " 5) Mostrar Database (tenta usar .env e cliente mysql/sqlite)"
+        echo " 6) Ver filas (queue:failed e queue:work status)"
+        echo " 7) Criar storage link (php artisan storage:link)"
+        echo " 8) Voltar / Sair"
+        read -p "Opção: " lar_opt
+
+        case "$lar_opt" in
+            1)
+                # confirma por segurança
+                read -p "Certeza que quer rodar migrations (irá alterar DB)? (s/N): " yn
+                case "$yn" in
+                    [sS]|[yY])
+                        echo "Rodando migrations... segura aí."
+                        php artisan migrate --force || echo "Falha ao rodar migrate. Checa as configs."
+                        ;;
+                    *)
+                        echo "Beleza, não rodei nada."
+                        ;;
+                esac
+                ;;
+
+            2)
+                echo "Status das migrations:"
+                php artisan migrate:status || echo "Não consegui pegar o status."
+                ;;
+
+            3)
+                echo "Rotas (mostrando primeiras 200 linhas):"
+                php artisan route:list 2>/dev/null | sed -n '1,200p' || echo "Não consegui listar rotas."
+                ;;
+
+            4)
+                echo "Limpando cache/config/rotas..."
+                php artisan cache:clear >/dev/null 2>&1 && echo "cache:clear OK" || echo "cache:clear falhou"
+                php artisan config:clear >/dev/null 2>&1 && echo "config:clear OK" || echo "config:clear falhou"
+                php artisan route:clear >/dev/null 2>&1 && echo "route:clear OK" || echo "route:clear falhou"
+                ;;
+
+            5)
+                # pega credenciais do .env
+                DB_CONN=$(read_env "DB_CONNECTION")
+                DB_HOST=$(read_env "DB_HOST")
+                DB_PORT=$(read_env "DB_PORT")
+                DB_DATABASE=$(read_env "DB_DATABASE")
+                DB_USERNAME=$(read_env "DB_USERNAME")
+                DB_PASSWORD=$(read_env "DB_PASSWORD")
+
+                echo -e "\nDB_CONNECTION: ${DB_CONN:-(não definido)}"
+                echo "DB_DATABASE: ${DB_DATABASE:-(não definido)}"
+                echo "DB_HOST: ${DB_HOST:-(não definido)}"
+                echo "DB_PORT: ${DB_PORT:-(não definido)}"
+                echo
+
+                if [ "$DB_CONN" = "mysql" ] || [ -z "$DB_CONN" ] && [ -n "$DB_DATABASE" ]; then
+                    if command -v mysql &>/dev/null; then
+                        echo "Tentando conectar com mysql client..."
+                        # usa MYSQL_PWD para não expor senha em argv
+                        if [ -z "$DB_PORT" ]; then DB_PORT=3306; fi
+                        MYSQL_PWD="$DB_PASSWORD" mysql -u "$DB_USERNAME" -h "${DB_HOST:-127.0.0.1}" -P "$DB_PORT" -D "$DB_DATABASE" -e "SHOW TABLES;" 2>/dev/null \
+                            && echo "Listagem acima (mysql)" \
+                            || echo "Falha ao listar tabelas via mysql. Checa se cliente mysql tá ok e credenciais."
+                    else
+                        echo "Cliente mysql não encontrado no PATH."
+                    fi
+                elif [ "$DB_CONN" = "sqlite" ] || [ -n "$DB_DATABASE" ] && [[ "$DB_DATABASE" == *.sqlite* || "$DB_DATABASE" == database/* ]]; then
+                    DB_FILE="$DB_DATABASE"
+                    if [ -f "$DB_FILE" ]; then
+                        if command -v sqlite3 &>/dev/null; then
+                            echo "Tabelas sqlite:"
+                            sqlite3 "$DB_FILE" ".tables"
+                        else
+                            echo "sqlite3 não encontrado no PATH."
+                        fi
+                    else
+                        echo "Arquivo sqlite não encontrado em $DB_FILE"
+                    fi
+                else
+                    echo "Tipo de DB não suportado automaticamente: ${DB_CONN:-desconhecido}. Só tentei mysql/sqlite aqui."
+                fi
+                ;;
+
+            6)
+                echo "Filas e jobs:"
+                php artisan queue:failed 2>/dev/null | sed -n '1,200p' || echo "Nenhum job failed listado ou comando falhou."
+                ;;
+
+            7)
+                echo "Criando link storage (storage:link)..."
+                php artisan storage:link >/dev/null 2>&1 && echo "storage:link OK" || echo "Falha ao criar storage link (checa permissões)."
+                ;;
+
+            8)
+                echo "Voltando..."
+                break
+                ;;
+
+            *)
+                echo "Opção inválida, bota um número certo aí."
+                ;;
+        esac
+    done
 }
-
-
 
 show_git() {
     if git rev-parse --is-inside-work-tree &>/dev/null; then
