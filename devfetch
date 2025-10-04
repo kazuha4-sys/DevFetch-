@@ -4,10 +4,79 @@
 # Mostra infos úteis para o Dev
 # ================================
 
+VERSION="1.2.0"
+REPO_URL="https://github.com/kazuha4-sys/devfetch.git"
+SCRIPT_PATH=$(realpath "$0")
+CONFIG_DIR="$HOME/.config/devfetch"
+CONFIG_FILE="$CONFIG_DIR/config"
+
+
+# Criar config se não existir 
+mkdir -p "$CONFIG_DIR"
+
+[ ! -f "$CONFIG_FILE" ] && echo "auto_update=false" > "$CONFIG_FILE"
+
+get_config() {
+    grep "$1" "$CONFIG_FILE" | cut -d'=' -f2
+}
+
+
+set_config() {
+    key="$1"
+    value="$2"
+    if grep -q "$key" "$CONFIG_FILE"; then
+        sed -i "s/^$key=.*/$key=$value/" "$CONFIG_FILE"
+    else
+        echo "$key=$value" >> "$CONFIG_FILE"
+    fi
+}
+
+check_update() {
+    latest_version=$(curl -s "https://raw.githubusercontent.com/kazuha4-sys/devfetch/main/VERSION" 2>/dev/null)
+    if [ -z "$latest_version" ]; then
+        echo "⚠️  Não foi possível verificar atualizações."
+        return
+    fi
+
+    if [ "$latest_version" != "$VERSION" ]; then
+        echo "🚀 Nova versão disponível: $latest_version (atual: $VERSION)"
+        return 0
+    else
+        echo "✅ Devfetch já está atualizado!"
+        return 1
+    fi
+}
+
+update_devfetch() {
+    check_update || return
+    echo -n "Deseja atualizar agora? (s/n): "
+    read -r ans
+    if [ "$ans" = "s" ]; then
+        echo "Baixando nova versão..."
+        tmpfile=$(mktemp)
+        curl -sL "https://raw.githubusercontent.com/kazuha4-sys/devfetch/main/devfetch" -o "$tmpfile"
+        chmod +x "$tmpfile"
+        mv "$tmpfile" "$SCRIPT_PATH"
+        echo "✅ Atualizado com sucesso para a versão mais nova!"
+    else
+        echo "🕓 Atualização cancelada."
+    fi
+}
+
+auto_update_check() {
+    auto=$(get_config "auto_update")
+    if [ "$auto" = "true" ]; then
+        check_update && update_devfetch
+    fi
+}
+
+
+
+
 # ================================
 # ASCII Art
 # ================================
-ascii=$(cat << ASCII
+ascii=$(cat << 'ASCII'
 \e[34m    ____                  ______         __            __ \e[0m
 \e[34m   / __ \  ___  _   __   / ____/  ___   / /_  _____   / /_ \e[0m
 \e[34m  / / / / / _ \| | / /  / /_     / _ \ / __/ / ___/  / __ \ \e[0m
@@ -18,7 +87,7 @@ ASCII
 )
 
 
-ascii_laravel=$(cat << ASCII
+ascii_laravel=$(cat << 'ASCII'
 \e[31m    █████ \e[0m                      
 \e[31m ███     ███ \e[0m                   
 \e[31m███       ███         ██ ██ \e[0m   
@@ -40,7 +109,7 @@ ascii_laravel=$(cat << ASCII
 ASCII
 )
 
-ascii_git=$(cat << ASCII
+ascii_git=$(cat << 'ASCII'
 \e[33m        _  _   \e[0m
 \e[31m       (_)| |  \e[0m
 \e[32m  __ _  _ | |_ \e[0m
@@ -50,26 +119,44 @@ ascii_git=$(cat << ASCII
 \e[32m  __/ | _______       \e[0m
 \e[34m |___/ / \e[0m
 \e[33m _____/ \e[0m
+
 ASCII
 )
    
 # ================================
 # Funções principais
 # ================================
-menu() {
-    echo "Vamos trabalhar com que:"
-    echo "(1) Git"
-    echo "(2) Docker"
-    echo "(3) Dev"
-    read -p "Opção: " opt
 
-    case "$opt" in
-        1) ./devfetch --loop ;;
-        2) show_docker ;;
-        3) ./devfetch --dev ;;
-        *) echo "Opção inválida!" ;;
-    esac
+menu() {
+    while true; do
+        clear
+        echo -e "\e[36m╔══════════════════════════════════════╗\e[0m"
+        echo -e "\e[36m║          ⚙️  DevFetch Menu           ║\e[0m"
+        echo -e "\e[36m╠══════════════════════════════════════╣\e[0m"
+        echo "  (1) Git"
+        echo "  (2) Docker"
+        echo "  (3) Dev"
+        echo "  (4) Laravel"
+        echo "  (0) Sair"
+        echo -e "\e[36m╚══════════════════════════════════════╝\e[0m"
+        echo
+        read -p "👉 Escolhe uma opção: " opt
+
+        case "$opt" in
+            1) devfetch --git ;;
+            2) devfetch --docker ;;
+            3) devfetch --dev ;;
+            4) devfetch --laravel ;;
+            0) echo "👋 Saindo do DevFetch..."; break ;;
+            *) echo "❌ Opção inválida!" ;;
+        esac
+
+        echo
+        read -p "Pressiona [Enter] pra voltar ao menu..." temp
+    done
 }
+
+
 show_dev() {
     # joga o ascii em linhas
     ascii_lines=()
@@ -128,12 +215,24 @@ show_laravel() {
     read_env() {
         local key="$1"
         if [ -f ".env" ]; then
-            # remove aspas e espaços
-            grep -E "^${key}=" .env 2>/dev/null | tail -n1 | cut -d'=' -f2- | sed -E 's/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/; s/^[[:space:]]+//; s/[[:space:]]+$//'
+            # pega a última ocorrência da chave, remove o prefixo KEY= e tira aspas ao redor
+            awk -F= -v k="$key" '
+                $1 == k { $1=""; sub(/^=/,""); val=$0 }
+                END {
+                    if (val=="") { print ""; exit }
+                    # remove aspas simples ou duplas ao redor
+                    if (val ~ /^".*"$/ || val ~ /^'\''.*'\''$/) {
+                        gsub(/^["'\'']|["'\'']$/,"",val)
+                    }
+                    # trim
+                    sub(/^[ \t]+/,"",val); sub(/[ \t]+$/,"",val);
+                    print val
+                }' .env 2>/dev/null || echo ""
         else
             echo ""
         fi
     }
+
 
     APP_NAME=$(read_env "APP_NAME")
     APP_ENV=$(read_env "APP_ENV")
@@ -332,15 +431,47 @@ loop_fetch() {
 # ================================
 main() {
     case "$1" in
-        "" ) menu ;;
-
-        --dev) show_dev ;;
-        --git) show_git ;;
-        --docker) show_docker ;;
-        --all|"") show_dev; echo; show_docker; echo; show_git ;;
-        --loop) loop_fetch ;;
-        --laravel) show_laravel ;;
-        *) echo "Uso: $0  [--dev | --git | --docker | --all | --loop] [--laravel |"; exit 1 ;;
+        update)
+            update_devfetch
+            ;;
+        autoupdate-on)
+            set_config "auto_update" "true"
+            echo "🔄 Atualização automática ativada."
+            ;;
+        autoupdate-off)
+            set_config "auto_update" "false"
+            echo "⏸️ Atualização automática desativada."
+            ;;
+        --dev)
+            show_dev
+            ;;
+        --git)
+            show_git
+            ;;
+        --docker)
+            show_docker
+            ;;
+        --laravel)
+            show_laravel
+            ;;
+        --loop)
+            loop_fetch
+            ;;
+        --all)
+            show_dev
+            echo
+            show_docker
+            echo
+            show_git
+            ;;
+        "" )
+            menu
+            ;;
+        *)
+            echo "🚫 Uso incorreto!"
+            echo "👉 Uso: $0 [--dev | --git | --docker | --laravel | --all | --loop | update | autoupdate-on | autoupdate-off]"
+            exit 1
+            ;;
     esac
 }
 
