@@ -34,15 +34,15 @@ set_config() {
 check_update() {
     latest_version=$(curl -s "https://raw.githubusercontent.com/kazuha4-sys/devfetch/main/VERSION" 2>/dev/null)
     if [ -z "$latest_version" ]; then
-        echo "⚠️  Não foi possível verificar atualizações."
+        echo "  Não foi possível verificar atualizações."
         return
     fi
 
     if [ "$latest_version" != "$VERSION" ]; then
-        echo "🚀 Nova versão disponível: $latest_version (atual: $VERSION)"
+        echo " Nova versão disponível: $latest_version (atual: $VERSION)"
         return 0
     else
-        echo "✅ Devfetch já está atualizado!"
+        echo " Devfetch já está atualizado!"
         return 1
     fi
 }
@@ -57,9 +57,9 @@ update_devfetch() {
         curl -sL "https://raw.githubusercontent.com/kazuha4-sys/devfetch/main/devfetch" -o "$tmpfile"
         chmod +x "$tmpfile"
         mv "$tmpfile" "$SCRIPT_PATH"
-        echo "✅ Atualizado com sucesso para a versão mais nova!"
+        echo " Atualizado com sucesso para a versão mais nova!"
     else
-        echo "🕓 Atualização cancelada."
+        echo " Atualização cancelada."
     fi
 }
 
@@ -130,29 +130,35 @@ ASCII
 menu() {
     while true; do
         clear
-        echo -e "\e[36m╔══════════════════════════════════════╗\e[0m"
-        echo -e "\e[36m║          ⚙️  DevFetch Menu           ║\e[0m"
-        echo -e "\e[36m╠══════════════════════════════════════╣\e[0m"
+
+        # joga o ascii em linhas
+        ascii_lines=()
+        while IFS= read -r line; do
+            ascii_lines+=("$line")
+        done < <(printf "%b\n" "$ascii")
+        # printa o ascii
+        for line in "${ascii_lines[@]}"; do
+            echo -e "$line"
+        done
         echo "  (1) Git"
         echo "  (2) Docker"
         echo "  (3) Dev"
         echo "  (4) Laravel"
         echo "  (0) Sair"
-        echo -e "\e[36m╚══════════════════════════════════════╝\e[0m"
         echo
-        read -p "👉 Escolhe uma opção: " opt
+        read -p "Escolhe uma opção: " opt
 
         case "$opt" in
-            1) devfetch --git ;;
+            1) devfetch --loop_git ;;
             2) devfetch --docker ;;
             3) devfetch --dev ;;
-            4) devfetch --laravel ;;
-            0) echo "👋 Saindo do DevFetch..."; break ;;
-            *) echo "❌ Opção inválida!" ;;
+            4) devfetch --loop_laravel ;;
+            0) echo "Saindo do DevFetch..."; break ;;
+            *) echo -e "\e[31m[ X ]\e[0m Digite um dos numeros das opções" ;;
         esac
 
         echo
-        read -p "Pressiona [Enter] pra voltar ao menu..." temp
+        read -p "" temp
     done
 }
 
@@ -396,7 +402,7 @@ show_git() {
             printf "%-35s %s\n" "$left" "$right"
         done
     else
-        echo "🌱 Git: não está em um repositório"
+        echo "Git: não está em um repositório"
     fi
 }
 
@@ -410,7 +416,7 @@ show_docker() {
     fi
 }
 
-loop_fetch() {
+loop_fetch_git() {
     # salva o cursor no topo
     tput civis # esconde o cursor (fica mais clean)
     trap "tput cnorm; exit" INT TERM # volta o cursor quando sair
@@ -419,12 +425,29 @@ loop_fetch() {
         tput cup 0 0   # manda o cursor pra linha 0, coluna 0
         printf '\033[0J'  # limpa da posição até o fim da tela
 
-        echo "_____________________________DevFetch_____________________________"
+        echo -e "_____________________________DevFetch_____________________________"
         show_git
 
         sleep 10
     done
 }
+
+loop_fetch_laravel() {
+    # salva o cursor no topo
+    tput civis # esconde o cursor (fica mais clean)
+    trap "tput cnorm; exit" INT TERM # volta o cursor quando sair
+
+    while true; do
+        tput cup 0 0   # manda o cursor pra linha 0, coluna 0
+        printf '\033[0J'  # limpa da posição até o fim da tela
+
+        echo -e "\e[31m_____________________________DevFetch_____________________________\e[0m"
+        echo 
+        show_laravel
+
+        sleep 10
+    done
+}       
 
 # ================================
 # Main
@@ -446,17 +469,22 @@ main() {
             show_dev
             ;;
         --git)
-            show_git
+            loop_fetch_git
             ;;
         --docker)
             show_docker
             ;;
         --laravel)
-            show_laravel
+            loop_fetch_laravel
             ;;
-        --loop)
-            loop_fetch
+        --loop_git)
+            loop_fetch_git
             ;;
+
+        --loop_laravel) 
+            loop_fetch_laravel
+            ;;
+
         --all)
             show_dev
             echo
