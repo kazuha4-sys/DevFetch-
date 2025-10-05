@@ -34,7 +34,7 @@ set_config() {
 check_update() {
     latest_version=$(curl -s "https://raw.githubusercontent.com/kazuha4-sys/devfetch/main/VERSION" 2>/dev/null)
     if [ -z "$latest_version" ]; then
-        echo "  Não foi possível verificar atualizações."
+        echo "\e[31m[ X ]\e[0m  Não foi possível verificar atualizações."
         return
     fi
 
@@ -69,9 +69,6 @@ auto_update_check() {
         check_update && update_devfetch
     fi
 }
-
-
-
 
 # ================================
 # ASCII Art
@@ -161,7 +158,6 @@ menu() {
         read -p "" temp
     done
 }
-
 
 show_dev() {
     # joga o ascii em linhas
@@ -355,11 +351,11 @@ show_laravel() {
 
             8)
                 echo "Voltando..."
-                break
+                devfetch
                 ;;
 
             *)
-                echo "Opção inválida, bota um número certo aí."
+                echo -e "\e[31m[ X ]\e[0m Opção inválida, bota um número certo aí."
                 ;;
         esac
     done
@@ -407,14 +403,77 @@ show_git() {
 }
 
 show_docker() {
+    echo -e "\n📦 \e[36mDocker\e[0m"
+
+    # detectar docker ou podman
     if command -v docker &>/dev/null; then
-        echo "📦 Docker"
-        echo "Containers ativos: $(docker ps -q | wc -l)"
-        docker ps --format ' - {{.Names}} ({{.Status}})'
+        ENGINE="docker"
+    elif command -v podman &>/dev/null; then
+        ENGINE="podman"
     else
-        echo "📦 Docker: não encontrado"
+        echo -e "\e[31m[ X ]\e[0m Docker/Podman: não encontrado"
+        return
+    fi
+
+    # checar se o daemon responde
+    if ! $ENGINE info &>/dev/null; then
+        echo -e "⚠️  $ENGINE instalado, mas o daemon não está rodando"
+        return
+    fi
+
+    # versão
+    echo -e "Versão: $($ENGINE --version | head -n1)"
+
+    # compose (plugin ou binário)
+    if command -v docker-compose &>/dev/null; then
+        echo -e "Compose: $(docker-compose --version | head -n1)"
+    elif $ENGINE compose version &>/dev/null; then
+        echo -e "Compose (plugin): $($ENGINE compose version | head -n1)"
+    fi
+
+    # contagens
+    running_count=$($ENGINE ps -q | wc -l)
+    total_count=$($ENGINE ps -a -q | wc -l)
+    images_count=$($ENGINE images -q | wc -l)
+    dangling_count=$($ENGINE images -f "dangling=true" -q | uniq | wc -l)
+    echo -e "Containers: 🟢 $running_count ativos / ⚪ $total_count total"
+    echo -e "Imagens: 📸 $images_count (🧹 $dangling_count órfãs)"
+
+    # containers rodando
+    if [ "$running_count" -gt 0 ]; then
+        echo -e "\n🧱 Containers ativos:"
+        $ENGINE ps --format " - \e[32m{{.Names}}\e[0m ({{.Status}}) [{{.Ports}}]" | sed -n '1,8p'
+    fi
+
+    # top CPU/MEM (snapshot)
+    echo -e "\n🔥 Uso de recursos:"
+    $ENGINE stats --no-stream --format " - {{.Name}} → CPU: {{.CPUPerc}} | MEM: {{.MemUsage}}" | sort -k2 -r | sed -n '1,5p'
+
+    # uso de disco
+    echo -e "\n💾 Espaço usado:"
+    $ENGINE system df --format "   {{.Type}}: {{.TotalSize}} (Reclamável: {{.Reclaimable}})" | sed -n '1,6p'
+
+    # compose status (no diretório atual)
+    if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ] || [ -f "compose.yaml" ]; then
+        echo -e "\n🧩 docker-compose detectado:"
+        if command -v docker-compose &>/dev/null; then
+            docker-compose ps --services --filter "status=running" 2>/dev/null | sed 's/^/ - /'
+        else
+            $ENGINE compose ps --format "json" 2>/dev/null | jq -r '.[].Service' 2>/dev/null | sed 's/^/ - /'
+        fi
+    fi
+
+    # mapa de portas
+    echo -e "\n🌐 Portas mapeadas:"
+    $ENGINE ps --format " - {{.Names}} → {{.Ports}}" | sed -n '1,10p'
+
+    # alertas simples
+    restarting=$($ENGINE ps --filter "status=restarting" -q | wc -l)
+    if [ "$restarting" -gt 0 ]; then
+        echo -e "\n⚠️  Aviso: $restarting container(es) reiniciando!"
     fi
 }
+
 
 loop_fetch_git() {
     # salva o cursor no topo
@@ -496,8 +555,9 @@ main() {
             menu
             ;;
         *)
-            echo "🚫 Uso incorreto!"
-            echo "👉 Uso: $0 [--dev | --git | --docker | --laravel | --all | --loop | update | autoupdate-on | autoupdate-off]"
+            echo
+            echo -e "\e[31m[ X ]\e[0m Uso incorreto!"
+            echo "[ - ] Uso: $0 [--dev | --git | --docker | --laravel | --all | --loop | update | autoupdate-on | autoupdate-off]"
             exit 1
             ;;
     esac
