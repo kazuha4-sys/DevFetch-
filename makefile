@@ -16,9 +16,11 @@ COMPLETIONS_ZSH = completions/_devfetch
 check:
 	@test -f $(BIN) || (echo "Erro: binário '$(BIN)' não encontrado. Rode 'make' ou compile antes." && false)
 	@echo "OK: achei $(BIN)"
+	@echo
 
 install: check
 	@echo "Instalando em $(PREFIX) (vai precisar de sudo se for /usr/local)..."
+	@echo
 	mkdir -p $(BINDIR) $(MANDIR)
 	install -m 0755 $(BIN) $(BINDIR)/$(BIN)
 	@if [ -f $(MAN) ]; then \
@@ -26,10 +28,13 @@ install: check
 	else \
 		echo "Aviso: manual $(MAN) não encontrado, pulando."; \
 	fi
+	@echo
 	@echo "Instalação completa: $(BINDIR)/$(BIN)"
 
 install-user: check
+	@echo
 	@echo "Instalando localmente em $(LOCAL_PREFIX) (sem sudo)..."
+	@echo
 	mkdir -p $(LOCAL_BINDIR) $(LOCAL_MANDIR)
 	install -m 0755 $(BIN) $(LOCAL_BINDIR)/$(BIN)
 	@if [ -f $(MAN) ]; then \
@@ -37,7 +42,9 @@ install-user: check
 	else \
 		echo "Aviso: manual $(MAN) não encontrado, pulando."; \
 	fi
+	@echo
 	@echo "Instalação local completa: $(LOCAL_BINDIR)/$(BIN)"
+	@echo
 	@echo "Certifica que $(LOCAL_BINDIR) esteja no PATH: export PATH=\$$PATH:$(LOCAL_BINDIR)"
 
 install-completions:

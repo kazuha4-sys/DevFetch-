@@ -398,7 +398,8 @@ show_git() {
             printf "%-35s %s\n" "$left" "$right"
         done
     else
-        echo "Git: não está em um repositório"
+        echo
+        echo -e "\e[31m[ X ]\e[0m Não está em um repositório"  
     fi
 }
 
